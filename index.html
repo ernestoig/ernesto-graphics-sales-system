@@ -524,6 +524,54 @@
         justify-content: flex-end;
       }
     }
+  
+    /* Theme controls */
+    .theme-toggle {
+      background: #242424; color: #fff; border: 1px solid #3b3b3b;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .theme-toggle:hover { background:#303030; }
+    body.light-mode {
+      background:
+        radial-gradient(circle at 15% 10%, rgba(252,163,17,.10), transparent 30%),
+        radial-gradient(circle at 85% 90%, rgba(252,163,17,.06), transparent 30%),
+        #f5f6f8;
+      color:#171717;
+    }
+    body.light-mode .app-shell .stats .stat-card,
+    body.light-mode .app-shell .card {
+      background:#fff; border-color:#e5e7eb; box-shadow:0 8px 28px rgba(0,0,0,.08);
+    }
+    body.light-mode .app-shell .stat-card .value,
+    body.light-mode .app-shell h2 { color:#171717; }
+    body.light-mode .app-shell input,
+    body.light-mode .app-shell select,
+    body.light-mode .app-shell textarea {
+      background:#fff; color:#171717; border-color:#d1d5db;
+    }
+    body.light-mode .app-shell table tr:hover td,
+    body.light-mode .app-shell .total-row { background:#f8fafc; }
+    body.light-mode .app-header { background:#fff; border-color:#e5e7eb; box-shadow:0 8px 28px rgba(0,0,0,.08); }
+    body.light-mode .app-brand h1 { color:#171717; }
+    body.light-mode .logout-btn,
+    body.light-mode .theme-toggle { background:#f3f4f6; color:#171717; border-color:#d1d5db; }
+    body.light-mode .theme-toggle:hover,
+    body.light-mode .logout-btn:hover { background:#e5e7eb; }
+    .invoice-sheet { position:relative; overflow:hidden; }
+    .invoice-watermark {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; z-index:0; overflow:hidden;
+    }
+    .invoice-watermark img {
+      width:min(62%, 430px); max-height:430px; object-fit:contain;
+      opacity:.075; filter:grayscale(1); transform:rotate(-12deg);
+    }
+    .invoice-sheet > *:not(.invoice-watermark) { position:relative; z-index:1; }
+    @media print {
+      .invoice-watermark { display:flex !important; }
+      .invoice-watermark img { opacity:.09 !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -563,6 +611,7 @@
       <button class="btn-success" onclick="openInvoiceForm()">Create Invoice</button>
       <button class="btn-secondary" onclick="exportCSV()">Export CSV</button>
       <button class="btn-danger" onclick="clearAll()">Clear All Data</button>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ Light Mode</button>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </header>
@@ -949,52 +998,3 @@
       const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `sales-export-${new Date().toISOString().slice(0,10)}.csv`;
-      link.click();
-    }
-
-
-    const INVOICE_KEY = 'salesTrackerInvoiceNumber';
-    const INVOICE_DATA_KEY = 'ernestoGraphicsInvoices';
-    const BUSINESS_NAME = 'ERNESTO GRAPHICS';
-    const CURRENCY = 'GH₵';
-    const AUTOMATION_KEY = 'ernestoGraphicsAutomationUrl';
-    let automationUrl = localStorage.getItem(AUTOMATION_KEY) || '';
-
-    let invoices = JSON.parse(localStorage.getItem(INVOICE_DATA_KEY) || '[]');
-
-    function formatInvoiceMoney(n) {
-      return CURRENCY + Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    }
-
-    function nextInvoiceNumber() {
-      let n = parseInt(localStorage.getItem(INVOICE_KEY) || '0', 10) + 1;
-      localStorage.setItem(INVOICE_KEY, String(n));
-      return 'INV-' + String(n).padStart(5, '0');
-    }
-
-    function openInvoiceForm() {
-      const card = document.getElementById('invoiceCard');
-      card.style.display = 'block';
-      document.getElementById('invoiceDate').valueAsDate = new Date();
-      document.getElementById('invoiceNumber').value = 'Generated when invoice is created';
-      updateInvoiceAmounts();
-      document.getElementById('invoiceCustomer').focus();
-      window.scrollTo({ top: card.offsetTop - 15, behavior: 'smooth' });
-    }
-
-    function closeInvoiceForm() {
-      document.getElementById('invoiceCard').style.display = 'none';
-    }
-
-    function resetInvoiceForm() {
-      ['invoiceCustomer','invoicePhone','invoiceEmail','invoiceAddress','invoiceItem','invoiceNotes'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('invoiceDate').valueAsDate = new Date();
-      document.getElementById('invoiceNumber').value = 'Generated when invoice is created';
-      document.getElementById('invoiceQty').value = 1;
-      document.getElementById('invoicePrice').value = '';
-      document.getElementById('invoiceTax').value = 0;
-      document.getElementById('invoiceAmountPaid').value = 0;
-      document.getElementById('invoicePayment').value = 'Unpaid';
-      updateInvoiceAmounts();
