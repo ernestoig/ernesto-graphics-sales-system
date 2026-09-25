@@ -704,6 +704,22 @@
     <div id="invoicePreview"></div>
   </div>
 
+  <div class="card" id="automationCard">
+    <h2>📧 Email Automation</h2>
+    <p style="color:#aaa;margin-bottom:14px">Connect your Gmail automation so every new invoice can notify you automatically. Your Gmail password is never stored in this website.</p>
+    <div class="form-grid">
+      <div style="grid-column:1/-1">
+        <label for="automationUrl">Google Apps Script Web App URL</label>
+        <input type="url" id="automationUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" type="button" onclick="saveAutomationSettings()">Save Automation</button>
+      <button class="btn-secondary" type="button" onclick="testAutomation()">Send Test</button>
+    </div>
+    <div id="automationStatus" style="margin-top:12px;color:#aaa;font-size:.88rem"></div>
+  </div>
+
   <div class="card" id="invoiceHistoryCard">
     <h2>Invoice History</h2>
     <div id="invoiceHistoryEmpty" class="empty">No invoices created yet.</div>
@@ -943,6 +959,8 @@
     const INVOICE_DATA_KEY = 'ernestoGraphicsInvoices';
     const BUSINESS_NAME = 'ERNESTO GRAPHICS';
     const CURRENCY = 'GH₵';
+    const AUTOMATION_KEY = 'ernestoGraphicsAutomationUrl';
+    let automationUrl = localStorage.getItem(AUTOMATION_KEY) || '';
 
     let invoices = JSON.parse(localStorage.getItem(INVOICE_DATA_KEY) || '[]');
 
@@ -980,239 +998,3 @@
       document.getElementById('invoiceAmountPaid').value = 0;
       document.getElementById('invoicePayment').value = 'Unpaid';
       updateInvoiceAmounts();
-    }
-
-    function updateInvoiceAmounts() {
-      const qty = parseFloat(document.getElementById('invoiceQty').value) || 0;
-      const price = parseFloat(document.getElementById('invoicePrice').value) || 0;
-      const taxRate = parseFloat(document.getElementById('invoiceTax').value) || 0;
-      const amount = +(qty * price * (1 + taxRate / 100)).toFixed(2);
-      let paid = parseFloat(document.getElementById('invoiceAmountPaid').value) || 0;
-      if (paid < 0) paid = 0;
-      if (paid > amount) paid = amount;
-      document.getElementById('invoiceAmount').value = amount.toFixed(2);
-      document.getElementById('invoiceAmountPaid').value = paid.toFixed(2);
-      document.getElementById('invoiceBalance').value = Math.max(0, amount - paid).toFixed(2);
-      const status = paid <= 0 ? 'Unpaid' : paid >= amount && amount > 0 ? 'Paid' : 'Partially Paid';
-      document.getElementById('invoicePayment').value = status;
-    }
-
-    ['invoiceQty','invoicePrice','invoiceTax','invoiceAmountPaid'].forEach(id => {
-      document.getElementById(id).addEventListener('input', updateInvoiceAmounts);
-    });
-
-    function generateInvoice(existingInvoice = null) {
-      const customer = document.getElementById('invoiceCustomer').value.trim();
-      const item = document.getElementById('invoiceItem').value.trim();
-      const date = document.getElementById('invoiceDate').value;
-      const qty = parseFloat(document.getElementById('invoiceQty').value) || 0;
-      const price = parseFloat(document.getElementById('invoicePrice').value) || 0;
-      const taxRate = parseFloat(document.getElementById('invoiceTax').value) || 0;
-      const phone = document.getElementById('invoicePhone').value.trim();
-      const email = document.getElementById('invoiceEmail').value.trim();
-      const address = document.getElementById('invoiceAddress').value.trim();
-      const notes = document.getElementById('invoiceNotes').value.trim();
-
-      if (!customer || !item || !date || qty <= 0 || price < 0) {
-        alert('Please complete the customer, date, item, quantity and unit price fields.');
-        return;
-      }
-
-      const subtotal = +(qty * price).toFixed(2);
-      const tax = +(subtotal * taxRate / 100).toFixed(2);
-      const amount = +(subtotal + tax).toFixed(2);
-      let amountPaid = parseFloat(document.getElementById('invoiceAmountPaid').value) || 0;
-      amountPaid = Math.min(Math.max(0, amountPaid), amount);
-      const balance = +(amount - amountPaid).toFixed(2);
-      const payment = amountPaid <= 0 ? 'Unpaid' : amountPaid >= amount ? 'Paid' : 'Partially Paid';
-      const invoiceNo = existingInvoice ? existingInvoice.invoiceNo : nextInvoiceNumber();
-
-      const invoice = {
-        invoiceNo, date, customer, phone, email, address, item, qty, price,
-        taxRate, subtotal, tax, amount, amountPaid, balance, payment, notes,
-        createdAt: existingInvoice ? existingInvoice.createdAt : new Date().toISOString()
-      };
-
-      if (!existingInvoice) invoices.unshift(invoice);
-      else invoices = invoices.map(x => x.invoiceNo === invoiceNo ? invoice : x);
-      localStorage.setItem(INVOICE_DATA_KEY, JSON.stringify(invoices));
-
-      document.getElementById('invoiceNumber').value = invoiceNo;
-      renderInvoice(invoice);
-      renderInvoiceHistory();
-      document.getElementById('invoicePrintArea').classList.add('show');
-      window.scrollTo({ top: document.getElementById('invoicePrintArea').offsetTop - 15, behavior: 'smooth' });
-    }
-
-    function renderInvoice(invoice) {
-      const logoSrc = document.querySelector('.brand-logo')?.src || '';
-      document.getElementById('invoicePreview').innerHTML = `
-        <div class="invoice-header">
-          <div class="invoice-brand">
-            ${logoSrc ? `<img class="invoice-logo" src="${logoSrc}" alt="Ernesto Graphics logo">` : ''}
-            <div>
-              <h2>${escapeHtml(BUSINESS_NAME)}</h2>
-              <div>Professional Sales Invoice • Quality Design at it best</div>
-            </div>
-          </div>
-          <div class="invoice-meta">
-            <strong>${escapeHtml(invoice.invoiceNo)}</strong>
-            <div>Date: ${escapeHtml(invoice.date)}</div>
-            <div>Status: ${escapeHtml(invoice.payment)}</div>
-          </div>
-        </div>
-        <div class="invoice-customer">
-          <strong>Bill To:</strong><br>
-          ${escapeHtml(invoice.customer)}<br>
-          ${invoice.phone ? escapeHtml(invoice.phone) + '<br>' : ''}
-          ${invoice.email ? escapeHtml(invoice.email) + '<br>' : ''}
-          ${invoice.address ? escapeHtml(invoice.address) : ''}
-        </div>
-        <table class="invoice-table">
-          <thead><tr><th>Item / Service</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
-          <tbody><tr>
-            <td>${escapeHtml(invoice.item)}</td>
-            <td>${invoice.qty}</td>
-            <td>${formatInvoiceMoney(invoice.price)}</td>
-            <td><strong>${formatInvoiceMoney(invoice.subtotal)}</strong></td>
-          </tr></tbody>
-        </table>
-        <div class="invoice-total">
-          <div class="invoice-total-row"><span>Subtotal</span><strong>${formatInvoiceMoney(invoice.subtotal)}</strong></div>
-          <div class="invoice-total-row"><span>Tax (${Number(invoice.taxRate).toFixed(2)}%)</span><strong>${formatInvoiceMoney(invoice.tax)}</strong></div>
-          <div class="invoice-total-row grand"><span>Amount</span><strong>${formatInvoiceMoney(invoice.amount)}</strong></div>
-          <div class="invoice-total-row"><span>Amount Paid</span><strong>${formatInvoiceMoney(invoice.amountPaid)}</strong></div>
-          <div class="invoice-total-row grand"><span>Balance Due</span><strong>${formatInvoiceMoney(invoice.balance)}</strong></div>
-        </div>
-        <div class="invoice-footer">
-          ${invoice.notes ? '<strong>Notes:</strong> ' + escapeHtml(invoice.notes) + '<br><br>' : ''}
-          Payment status: <strong>${escapeHtml(invoice.payment)}</strong><br><br>
-          Thank you for your business.
-        </div>
-        <div class="invoice-tools">
-          <button class="btn-primary" onclick="printInvoice()">Print / Save PDF</button>
-          <button class="btn-secondary" onclick="closeInvoicePreview()">Close Preview</button>
-        </div>`;
-    }
-
-    function printInvoice() {
-      const area = document.getElementById('invoicePrintArea');
-      if (!area || !area.classList.contains('show')) {
-        alert('Please generate or open an invoice before printing.');
-        return;
-      }
-      // Give the browser a moment to finish rendering the logo and invoice.
-      requestAnimationFrame(() => {
-        setTimeout(() => window.print(), 100);
-      });
-    }
-
-    function closeInvoicePreview() {
-      document.getElementById('invoicePrintArea').classList.remove('show');
-    }
-
-    function loadInvoice(invoiceNo) {
-      const invoice = invoices.find(x => x.invoiceNo === invoiceNo);
-      if (!invoice) return;
-      document.getElementById('invoiceCard').style.display = 'block';
-      document.getElementById('invoiceNumber').value = invoice.invoiceNo;
-      document.getElementById('invoiceDate').value = invoice.date;
-      document.getElementById('invoiceCustomer').value = invoice.customer;
-      document.getElementById('invoicePhone').value = invoice.phone || '';
-      document.getElementById('invoiceEmail').value = invoice.email || '';
-      document.getElementById('invoiceAddress').value = invoice.address || '';
-      document.getElementById('invoiceItem').value = invoice.item;
-      document.getElementById('invoiceQty').value = invoice.qty;
-      document.getElementById('invoicePrice').value = invoice.price;
-      document.getElementById('invoiceTax').value = invoice.taxRate;
-      document.getElementById('invoiceAmountPaid').value = invoice.amountPaid;
-      document.getElementById('invoicePayment').value = invoice.payment;
-      document.getElementById('invoiceNotes').value = invoice.notes || '';
-      updateInvoiceAmounts();
-      renderInvoice(invoice);
-      document.getElementById('invoicePrintArea').classList.add('show');
-      window.scrollTo({top: document.getElementById('invoiceCard').offsetTop - 15, behavior:'smooth'});
-    }
-
-    function deleteInvoice(invoiceNo) {
-      if (!confirm('Delete this invoice?')) return;
-      invoices = invoices.filter(x => x.invoiceNo !== invoiceNo);
-      localStorage.setItem(INVOICE_DATA_KEY, JSON.stringify(invoices));
-      renderInvoiceHistory();
-    }
-
-    function renderInvoiceHistory() {
-      const empty = document.getElementById('invoiceHistoryEmpty');
-      const table = document.getElementById('invoiceHistoryTable');
-      const body = document.getElementById('invoiceHistoryBody');
-      if (!invoices.length) {
-        empty.style.display = 'block'; table.style.display = 'none'; body.innerHTML = ''; return;
-      }
-      empty.style.display = 'none'; table.style.display = 'table';
-      body.innerHTML = invoices.map(inv => {
-        const cls = inv.payment === 'Paid' ? 'paid' : inv.payment === 'Partially Paid' ? 'partial' : 'unpaid';
-        return `<tr>
-          <td>${escapeHtml(inv.invoiceNo)}</td><td>${escapeHtml(inv.date)}</td>
-          <td>${escapeHtml(inv.customer)}</td><td>${formatInvoiceMoney(inv.amount)}</td>
-          <td>${formatInvoiceMoney(inv.amountPaid)}</td><td>${formatInvoiceMoney(inv.balance)}</td>
-          <td class="invoice-history-status ${cls}">${escapeHtml(inv.payment)}</td>
-          <td><button class="btn-secondary" onclick="loadInvoice('${inv.invoiceNo}')">View</button>
-              <button class="btn-danger" onclick="deleteInvoice('${inv.invoiceNo}')">Delete</button></td>
-        </tr>`;
-      }).join('');
-    }
-
-    // Ernesto Graphics administrator authentication.
-    // Standalone local-app credentials:
-    // Username: ERNESTO
-    // Password: ERNESTO@2026
-    const ADMIN_USERNAME = 'ERNESTO';
-    const ADMIN_PASSWORD = 'ERNESTO@2026';
-    const AUTH_KEY = 'ernestoGraphicsAuthenticated';
-
-    function showApp() {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'block';
-    }
-
-    function showLogin() {
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appShell').style.display = 'none';
-    }
-
-    function logout() {
-      sessionStorage.removeItem(AUTH_KEY);
-      showLogin();
-      document.getElementById('loginPassword').value = '';
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const username = document.getElementById('loginUsername').value.trim();
-      const password = document.getElementById('loginPassword').value;
-
-      if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        sessionStorage.setItem(AUTH_KEY, 'true');
-        document.getElementById('loginError').style.display = 'none';
-        showApp();
-      } else {
-        document.getElementById('loginError').style.display = 'block';
-      }
-    });
-
-    if (sessionStorage.getItem(AUTH_KEY) === 'true') {
-      showApp();
-    } else {
-      showLogin();
-    }
-
-    // Initial load
-    updateStats();
-    applyFilters();
-    renderInvoiceHistory();
-    updateInvoiceAmounts();
-  </script>
-
-  </main>
-</body>
-</html>
